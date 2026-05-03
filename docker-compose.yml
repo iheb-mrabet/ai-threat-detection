@@ -6,13 +6,8 @@ services:
     container_name: ai-threat-backend
     ports:
       - "8000:8000"
-    environment:
-      API_KEY: dev-secret-key
-      DATABASE_URL: postgresql://threat_user:threat_pass@postgres:5432/threat_db
-      REDIS_URL: redis://redis:6379/0
-      ALERT_CHANNEL: ai-threat-alerts
-      LOG_TAIL_ENABLED: "true"
-      LOG_FILE_PATH: /logs/access.log
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

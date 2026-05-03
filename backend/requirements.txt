@@ -12,3 +12,6 @@ redis
 onnxruntime
 websockets
 requests
+python-dotenv
+slowapi
+structlog

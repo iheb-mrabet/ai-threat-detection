@@ -1,7 +1,12 @@
+import os
 from fastapi import Header, HTTPException
-from backend.app.config import API_KEY
+
+API_KEY = os.getenv("API_KEY", "dev-secret-key")
 
 
-def verify_api_key(x_api_key: str = Header(default="")):
+def verify_api_key(x_api_key: str = Header(None)):
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="API key not configured")
+
     if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+        raise HTTPException(status_code=401, detail="Unauthorized")

@@ -1,10 +1,14 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import uuid
 
-from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from backend.app.config import APP_NAME, APP_VERSION
+from backend.app.logger import logger
 from backend.app.security import verify_api_key
 from backend.app.schemas import (
     AnalyzeRequest,
@@ -34,11 +38,18 @@ from backend.app.db.repository import (
 from backend.ml.inference import ml_detector, reload_ml_detector
 
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title=APP_NAME,
     description="Advanced nginx log threat detection system with rule-based detection, ML ensemble, ONNX inference, and persistent storage.",
     version=APP_VERSION
 )
+
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,
@@ -164,11 +175,13 @@ def models_retrain():
 
 
 @app.post("/analyze", response_model=DetectionResponse, dependencies=[Depends(verify_api_key)])
-async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
-    result = detect(request.log_line)
-    event = build_event(request.log_line, result)
+@limiter.limit("100/minute")
+async def analyze(request: Request, payload: AnalyzeRequest, db: Session = Depends(get_db)):
+    result = detect(payload.log_line)
+    event = build_event(payload.log_line, result)
 
     await persist_and_dispatch(event, db)
+    logger.info("event_processed", event_id=event["id"], threat=event["is_threat"], score=event["score"])
 
     return result
 
@@ -339,3 +352,40 @@ async def websocket_alerts(websocket: WebSocket):
     except WebSocketDisconnect:
         if websocket in ACTIVE_WEBSOCKETS:
             ACTIVE_WEBSOCKETS.remove(websocket)
+
+
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request, exc):
+    return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
+
+
+@app.get("/monitoring/health")
+def monitoring_health():
+    return {"status": "ok", "service": "ai-threat-detection"}
+
+@app.get("/monitoring/metrics", dependencies=[Depends(verify_api_key)])
+def monitoring_metrics(db: Session = Depends(get_db)):
+    return {
+        "service": "ai-threat-detection",
+        "status": "running",
+        "stats": db_stats(db),
+        "model_ready": ml_detector.status().get("ready"),
+        "redis": redis_publisher.status()
+    }
+
+@app.get("/monitoring/health")
+def monitoring_health():
+    return {"status": "ok", "service": "ai-threat-detection"}
+
+@app.get("/monitoring/metrics", dependencies=[Depends(verify_api_key)])
+def monitoring_metrics(db: Session = Depends(get_db)):
+    return {
+        "service": "ai-threat-detection",
+        "status": "running",
+        "stats": db_stats(db),
+        "model_ready": ml_detector.status().get("ready"),
+        "redis": redis_publisher.status()
+    }
