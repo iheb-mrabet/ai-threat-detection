@@ -1,32 +1,39 @@
 import os
-from datetime import datetime, timedelta
+import hashlib
+from datetime import datetime, timedelta, timezone
 from jose import jwt
-from passlib.context import CryptContext
 
-SECRET_KEY = os.getenv("JWT_SECRET", "super-secret")
+SECRET_KEY = os.getenv("JWT_SECRET", "dev-jwt-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# fake user (replace later with DB)
-fake_user = {
-    "username": "admin",
-    "password": pwd_context.hash("admin123")
-}
 
-def verify_password(plain, hashed):
-    return pwd_context.verify(plain, hashed)
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-def authenticate_user(username, password):
-    if username != fake_user["username"]:
+
+ADMIN_PASSWORD_HASH = hash_password(ADMIN_PASSWORD)
+
+
+def verify_password(plain_password: str, password_hash: str) -> bool:
+    return hash_password(plain_password) == password_hash
+
+
+def authenticate_user(username: str, password: str):
+    if username != ADMIN_USERNAME:
         return False
-    if not verify_password(password, fake_user["password"]):
+
+    if not verify_password(password, ADMIN_PASSWORD_HASH):
         return False
+
     return {"username": username}
 
+
 def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    payload = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload.update({"exp": expire})
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)

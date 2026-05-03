@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 
 import joblib
 import numpy as np
+import pandas as pd
 import onnxruntime as ort
 
 
@@ -21,16 +22,13 @@ class MLDetector:
             self.iso = joblib.load(os.path.join(MODEL_DIR, "isolation_forest.pkl"))
             self.scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.pkl"))
 
-            metadata_path = os.path.join(MODEL_DIR, "metadata.json")
-            if os.path.exists(metadata_path):
-                with open(metadata_path, "r") as f:
-                    self.metadata = json.load(f)
+            with open(os.path.join(MODEL_DIR, "metadata.json"), "r") as f:
+                self.metadata = json.load(f)
 
             self.feature_names = self.metadata.get("features", [])
 
-            onnx_path = os.path.join(MODEL_DIR, "autoencoder.onnx")
             self.onnx_session = ort.InferenceSession(
-                onnx_path,
+                os.path.join(MODEL_DIR, "autoencoder.onnx"),
                 providers=["CPUExecutionProvider"]
             )
             self.onnx_input_name = self.onnx_session.get_inputs()[0].name
@@ -40,11 +38,11 @@ class MLDetector:
         except Exception as e:
             self.ready = False
             self.metadata = {
-                "error": str(e),
-                "status": "models_not_loaded"
+                "status": "models_not_loaded",
+                "error": str(e)
             }
 
-    def status(self) -> Dict[str, Any]:
+    def status(self):
         return {
             "ready": self.ready,
             "inference_backend": {
@@ -61,13 +59,13 @@ class MLDetector:
             "metadata": self.metadata
         }
 
-    def _ordered_features(self, features_dict: Dict[str, float]) -> np.ndarray:
-        if self.feature_names:
-            values = [features_dict.get(name, 0.0) for name in self.feature_names]
-        else:
-            values = list(features_dict.values())
+    def _to_dataframe(self, features_dict: Dict[str, float]) -> pd.DataFrame:
+        row = {
+            feature: float(features_dict.get(feature, 0.0))
+            for feature in self.feature_names
+        }
 
-        return np.array([values], dtype=np.float32)
+        return pd.DataFrame([row], columns=self.feature_names)
 
     def predict(self, features_dict: Dict[str, float]) -> Dict[str, float]:
         if not self.ready:
@@ -79,8 +77,8 @@ class MLDetector:
                 "ml_score": 0.0
             }
 
-        X = self._ordered_features(features_dict)
-        X_scaled = self.scaler.transform(X).astype(np.float32)
+        X_df = self._to_dataframe(features_dict)
+        X_scaled = self.scaler.transform(X_df).astype(np.float32)
 
         rf_score = float(self.rf.predict_proba(X_scaled)[0][1])
 
@@ -97,10 +95,15 @@ class MLDetector:
         ae_threshold = self.metadata.get("calibration", {}).get("ae_threshold_95", 1.0)
         autoencoder_score = min(max(reconstruction_error / (ae_threshold + 1e-6), 0.0), 1.0)
 
+        weights = self.metadata.get("ensemble", {})
+        rf_weight = weights.get("rf_weight", 0.4)
+        ae_weight = weights.get("ae_weight", 0.4)
+        if_weight = weights.get("if_weight", 0.2)
+
         ml_score = (
-            0.40 * rf_score +
-            0.40 * autoencoder_score +
-            0.20 * isolation_score
+            rf_weight * rf_score +
+            ae_weight * autoencoder_score +
+            if_weight * isolation_score
         )
 
         return {

@@ -1,0 +1,23 @@
+{
+    "threshold": 0.5,
+    "confusion_matrix": {
+        "TP": 1148,
+        "TN": 3466,
+        "FP": 304,
+        "FN": 82
+    },
+    "FAR": 0.080637,
+    "FRR": 0.066667,
+    "EER": 0.073862,
+    "EER_threshold": 0.517,
+    "precision": 0.790634,
+    "recall": 0.933333,
+    "f1_score": 0.856078,
+    "roc_auc": 0.986063,
+    "pr_auc": 0.964298,
+    "interpretation": {
+        "FAR": "False Acceptance Rate: benign traffic incorrectly accepted as malicious. Equivalent to false positive rate in this system.",
+        "FRR": "False Rejection Rate: malicious traffic incorrectly rejected as benign. Equivalent to false negative rate in this system.",
+        "EER": "Equal Error Rate: threshold point where FAR and FRR are approximately equal."
+    }
+}

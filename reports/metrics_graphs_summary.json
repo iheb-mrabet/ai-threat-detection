@@ -1,0 +1,11 @@
+{
+    "roc_auc": 0.986063,
+    "pr_auc": 0.964292,
+    "eer": 0.073862,
+    "eer_threshold": 0.517,
+    "graphs": [
+        "reports/roc_curve.png",
+        "reports/far_frr_eer_curve.png",
+        "reports/precision_recall_curve.png"
+    ]
+}

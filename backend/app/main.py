@@ -407,3 +407,41 @@ def login(username: str = Form(...), password: str = Form(...)):
 
     token = create_access_token({"sub": username})
     return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/models/metrics-graphs", dependencies=[Depends(verify_api_key)])
+def get_metrics_graphs():
+    import json
+    import os
+
+    path = "reports/metrics_graphs_summary.json"
+
+    if not os.path.exists(path):
+        return {
+            "ready": False,
+            "message": "Graphs not generated yet. Run: python -m backend.ml.metrics_graphs"
+        }
+
+    with open(path, "r") as f:
+        return {
+            "ready": True,
+            "summary": json.load(f)
+        }
+
+@app.get("/models/security-metrics", dependencies=[Depends(verify_api_key)])
+def get_security_metrics():
+    import json
+    import os
+
+    path = "models/security_metrics.json"
+
+    if not os.path.exists(path):
+        return {
+            "ready": False,
+            "message": "Security metrics not computed yet. Run: python -m backend.ml.security_metrics"
+        }
+
+    with open(path, "r") as f:
+        return {
+            "ready": True,
+            "metrics": json.load(f)
+        }
