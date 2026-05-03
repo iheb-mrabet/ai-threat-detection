@@ -200,3 +200,74 @@ td {
     align-items: flex-start;
   }
 }
+
+.nav {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.nav a {
+  color: #dbeafe;
+  background: #1e293b;
+  border: 1px solid #334155;
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+}
+
+.nav a:hover {
+  background: #2563eb;
+}
+
+.simulation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.simulation-card {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.simulation-card button {
+  width: 100%;
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.simulation-card button:hover {
+  background: #1d4ed8;
+}
+
+.simulation-card p {
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.simulation-status {
+  background: #172554;
+  color: #bfdbfe;
+  border: 1px solid #1d4ed8;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .simulation-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -5,17 +5,127 @@ import "./App.css";
 const API_BASE = "http://127.0.0.1:8000";
 const API_KEY = "dev-secret-key";
 
-function App() {
+const headers = {
+  "X-API-Key": API_KEY,
+};
+
+const attackSimulations = [
+  {
+    name: "SQL Injection",
+    description: "Injects SQL logic into a query parameter to test authentication bypass or database extraction detection.",
+    log_line: `10.0.0.5 - - [03/May/2026:10:01:00 +0100] "GET /login?user=admin' OR 1=1-- HTTP/1.1" 200 900`
+  },
+  {
+    name: "XSS",
+    description: "Sends script-like content to test detection of client-side code injection attempts.",
+    log_line: `10.0.0.6 - - [03/May/2026:10:02:00 +0100] "GET /search?q=<script>alert(1)</script> HTTP/1.1" 200 1200`
+  },
+  {
+    name: "Path Traversal",
+    description: "Uses ../ style paths to test detection of attempts to access files outside the web directory.",
+    log_line: `10.0.0.7 - - [03/May/2026:10:03:00 +0100] "GET /download?file=../../../etc/passwd HTTP/1.1" 403 700`
+  },
+  {
+    name: "Command Injection",
+    description: "Sends command-like parameters to test detection of suspicious operating-system command patterns.",
+    log_line: `10.0.0.8 - - [03/May/2026:10:04:00 +0100] "GET /api?cmd=whoami HTTP/1.1" 200 800`
+  },
+  {
+    name: "SSRF",
+    description: "Attempts to make the server request an internal or sensitive address through a URL parameter.",
+    log_line: `10.0.0.9 - - [03/May/2026:10:05:00 +0100] "GET /fetch?url=http://169.254.169.254/latest/meta-data/ HTTP/1.1" 403 600`
+  },
+  {
+    name: "Log4Shell",
+    description: "Uses a Log4Shell-like lookup string to test detection of dangerous logging payload patterns.",
+    log_line: `10.0.0.10 - - [03/May/2026:10:06:00 +0100] "GET /?q=\${jndi:ldap://example.local/a} HTTP/1.1" 400 500`
+  },
+  {
+    name: "Spoofing",
+    description: "Simulates identity spoofing through suspicious admin/root parameters.",
+    log_line: `10.0.0.11 - - [03/May/2026:10:07:00 +0100] "GET /admin?user=root&spoofed_ip=127.0.0.1 HTTP/1.1" 403 650`
+  },
+  {
+    name: "Noise / Bruit",
+    description: "Adds random-looking characters and unusual request patterns to test model robustness against noisy input.",
+    log_line: `10.0.0.12 - - [03/May/2026:10:08:00 +0100] "GET /search?q=%%%%%252525@@@@@!!!!admin HTTP/1.1" 400 450`
+  },
+  {
+    name: "Compression / Encoded Payload",
+    description: "Uses encoded payloads to test whether obfuscated attacks are still detected.",
+    log_line: `10.0.0.13 - - [03/May/2026:10:09:00 +0100] "GET /login?user=admin%27%20OR%201%3D1-- HTTP/1.1" 200 900`
+  }
+];
+
+function Navigation() {
+  return (
+    <nav className="nav">
+      <a href="/">Dashboard</a>
+      <a href="/attacks">Attack Simulations</a>
+    </nav>
+  );
+}
+
+function AttackPage() {
+  const [simulationStatus, setSimulationStatus] = useState("");
+
+  async function simulateAttack(simulation) {
+    try {
+      setSimulationStatus(`Running ${simulation.name} simulation...`);
+
+      const response = await axios.post(
+        `${API_BASE}/analyze`,
+        { log_line: simulation.log_line },
+        { headers }
+      );
+
+      setSimulationStatus(
+        `${simulation.name} simulated. Result: ${response.data.threat_type} | Score: ${response.data.score}`
+      );
+    } catch (error) {
+      console.error(error);
+      setSimulationStatus(`Simulation failed: ${simulation.name}`);
+    }
+  }
+
+  return (
+    <div className="app">
+      <Navigation />
+
+      <header className="header">
+        <div>
+          <h1>Attack Simulations</h1>
+          <p>Run safe simulated nginx attack logs and watch the dashboard update in real time.</p>
+        </div>
+      </header>
+
+      {simulationStatus && (
+        <div className="simulation-status">{simulationStatus}</div>
+      )}
+
+      <section className="panel">
+        <div className="simulation-grid">
+          {attackSimulations.map((simulation) => (
+            <div className="simulation-card" key={simulation.name}>
+              <button onClick={() => simulateAttack(simulation)}>
+                Run {simulation.name}
+              </button>
+              <p>{simulation.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [events, setEvents] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [modelStatus, setModelStatus] = useState(null);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [status, setStatus] = useState("connecting");
-
-  const headers = {
-    "X-API-Key": API_KEY,
-  };
 
   async function loadData() {
     try {
@@ -44,9 +154,7 @@ function App() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "connection") {
-        return;
-      }
+      if (data.type === "connection") return;
 
       setLiveAlerts((prev) => [data, ...prev].slice(0, 10));
       loadData();
@@ -67,6 +175,8 @@ function App() {
 
   return (
     <div className="app">
+      <Navigation />
+
       <header className="header">
         <div>
           <h1>AI Threat Detection Dashboard</h1>
@@ -187,6 +297,16 @@ function App() {
       </section>
     </div>
   );
+}
+
+function App() {
+  const path = window.location.pathname;
+
+  if (path === "/attacks") {
+    return <AttackPage />;
+  }
+
+  return <DashboardPage />;
 }
 
 export default App;
