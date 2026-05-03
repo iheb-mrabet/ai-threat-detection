@@ -181,6 +181,9 @@ async def analyze(request: Request, payload: AnalyzeRequest, db: Session = Depen
     event = build_event(payload.log_line, result)
 
     await persist_and_dispatch(event, db)
+    from backend.app.notifier import send_alert
+    if event['is_threat']:
+        send_alert(event)
     logger.info("event_processed", event_id=event["id"], threat=event["is_threat"], score=event["score"])
 
     return result
@@ -196,6 +199,9 @@ async def ingest_batch(request: BatchAnalyzeRequest, db: Session = Depends(get_d
         event = build_event(log_line, result)
 
         await persist_and_dispatch(event, db)
+    from backend.app.notifier import send_alert
+    if event['is_threat']:
+        send_alert(event)
 
         if result["is_threat"]:
             threats_detected += 1
@@ -389,3 +395,15 @@ def monitoring_metrics(db: Session = Depends(get_db)):
         "model_ready": ml_detector.status().get("ready"),
         "redis": redis_publisher.status()
     }
+
+from fastapi import Form
+from backend.app.auth import authenticate_user, create_access_token
+
+@app.post("/auth/login")
+def login(username: str = Form(...), password: str = Form(...)):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_access_token({"sub": username})
+    return {"access_token": token, "token_type": "bearer"}
