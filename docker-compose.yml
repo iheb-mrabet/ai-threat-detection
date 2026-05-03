@@ -1,0 +1,60 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai-threat-backend
+    ports:
+      - "8000:8000"
+    environment:
+      API_KEY: dev-secret-key
+      DATABASE_URL: postgresql://threat_user:threat_pass@postgres:5432/threat_db
+      REDIS_URL: redis://redis:6379/0
+      ALERT_CHANNEL: ai-threat-alerts
+      LOG_TAIL_ENABLED: "true"
+      LOG_FILE_PATH: /logs/access.log
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./dev-log:/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: ai-threat-postgres
+    environment:
+      POSTGRES_USER: threat_user
+      POSTGRES_PASSWORD: threat_pass
+      POSTGRES_DB: threat_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threat_user -d threat_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: ai-threat-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

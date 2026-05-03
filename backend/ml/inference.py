@@ -4,10 +4,7 @@ from typing import Dict, Any, List
 
 import joblib
 import numpy as np
-import torch
 import onnxruntime as ort
-
-from backend.ml.autoencoder import Autoencoder
 
 
 MODEL_DIR = "models"
@@ -16,7 +13,6 @@ MODEL_DIR = "models"
 class MLDetector:
     def __init__(self):
         self.ready = False
-        self.use_onnx_autoencoder = False
         self.metadata: Dict[str, Any] = {}
         self.feature_names: List[str] = []
 
@@ -33,24 +29,11 @@ class MLDetector:
             self.feature_names = self.metadata.get("features", [])
 
             onnx_path = os.path.join(MODEL_DIR, "autoencoder.onnx")
-
-            if os.path.exists(onnx_path):
-                self.onnx_session = ort.InferenceSession(
-                    onnx_path,
-                    providers=["CPUExecutionProvider"]
-                )
-                self.onnx_input_name = self.onnx_session.get_inputs()[0].name
-                self.use_onnx_autoencoder = True
-            else:
-                ae_checkpoint = torch.load(
-                    os.path.join(MODEL_DIR, "autoencoder.pt"),
-                    map_location="cpu"
-                )
-
-                self.ae = Autoencoder(input_dim=ae_checkpoint["input_dim"])
-                self.ae.load_state_dict(ae_checkpoint["model_state_dict"])
-                self.ae.eval()
-                self.use_onnx_autoencoder = False
+            self.onnx_session = ort.InferenceSession(
+                onnx_path,
+                providers=["CPUExecutionProvider"]
+            )
+            self.onnx_input_name = self.onnx_session.get_inputs()[0].name
 
             self.ready = True
 
@@ -67,12 +50,11 @@ class MLDetector:
             "inference_backend": {
                 "random_forest": "sklearn",
                 "isolation_forest": "sklearn",
-                "autoencoder": "onnxruntime" if self.use_onnx_autoencoder else "pytorch_fallback"
+                "autoencoder": "onnxruntime"
             },
             "models": {
                 "random_forest": os.path.exists(os.path.join(MODEL_DIR, "random_forest.pkl")),
                 "isolation_forest": os.path.exists(os.path.join(MODEL_DIR, "isolation_forest.pkl")),
-                "autoencoder_pt": os.path.exists(os.path.join(MODEL_DIR, "autoencoder.pt")),
                 "autoencoder_onnx": os.path.exists(os.path.join(MODEL_DIR, "autoencoder.onnx")),
                 "scaler": os.path.exists(os.path.join(MODEL_DIR, "scaler.pkl")),
             },
@@ -87,20 +69,6 @@ class MLDetector:
 
         return np.array([values], dtype=np.float32)
 
-    def _autoencoder_reconstruct(self, X_scaled: np.ndarray) -> np.ndarray:
-        X_scaled = X_scaled.astype(np.float32)
-
-        if self.use_onnx_autoencoder:
-            output = self.onnx_session.run(
-                None,
-                {self.onnx_input_name: X_scaled}
-            )[0]
-            return output
-
-        with torch.no_grad():
-            x_tensor = torch.tensor(X_scaled, dtype=torch.float32)
-            return self.ae(x_tensor).numpy()
-
     def predict(self, features_dict: Dict[str, float]) -> Dict[str, float]:
         if not self.ready:
             return {
@@ -112,7 +80,7 @@ class MLDetector:
             }
 
         X = self._ordered_features(features_dict)
-        X_scaled = self.scaler.transform(X)
+        X_scaled = self.scaler.transform(X).astype(np.float32)
 
         rf_score = float(self.rf.predict_proba(X_scaled)[0][1])
 
@@ -120,9 +88,12 @@ class MLDetector:
         iso_threshold = self.metadata.get("calibration", {}).get("iso_threshold_95", 0.1)
         isolation_score = min(max(raw_iso / (iso_threshold + 1e-6), 0.0), 1.0)
 
-        reconstructed = self._autoencoder_reconstruct(X_scaled)
-        reconstruction_error = float(np.mean((X_scaled - reconstructed) ** 2))
+        reconstructed = self.onnx_session.run(
+            None,
+            {self.onnx_input_name: X_scaled}
+        )[0]
 
+        reconstruction_error = float(np.mean((X_scaled - reconstructed) ** 2))
         ae_threshold = self.metadata.get("calibration", {}).get("ae_threshold_95", 1.0)
         autoencoder_score = min(max(reconstruction_error / (ae_threshold + 1e-6), 0.0), 1.0)
 

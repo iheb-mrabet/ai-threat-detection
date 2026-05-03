@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
+import uuid
+
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from sqlalchemy.orm import Session
 
 from backend.app.config import APP_NAME, APP_VERSION
 from backend.app.security import verify_api_key
@@ -9,23 +12,77 @@ from backend.app.schemas import (
     BatchDetectionResponse
 )
 from backend.app.detector import detect
-from backend.app.storage import save_alert, save_event, get_alerts, get_stats
+from backend.app.storage import save_alert, save_event, get_alerts, get_stats, get_events
 from backend.app.pipeline.queue import raw_queue
 from backend.app.pipeline.engine import start_pipeline
 from backend.app.alerts import ACTIVE_WEBSOCKETS, broadcast_alert
+from backend.app.redis_client import redis_publisher
+
+from backend.app.db.database import get_db, Base, engine
+from backend.app.db.repository import (
+    create_event,
+    create_alert,
+    list_events,
+    list_alerts,
+    review_event,
+    stats as db_stats
+)
+
 from backend.ml.inference import ml_detector, reload_ml_detector
-from backend.ml.train_classifiers import train as retrain_models
+
 
 app = FastAPI(
     title=APP_NAME,
-    description="Advanced nginx log threat detection system with rule-based and ML ensemble detection.",
+    description="Advanced nginx log threat detection system with rule-based detection, ML ensemble, ONNX inference, and persistent storage.",
     version=APP_VERSION
 )
 
 
 @app.on_event("startup")
 async def startup_event():
+    Base.metadata.create_all(bind=engine)
+
+    # start async pipeline
     await start_pipeline()
+
+    # start Redis subscriber
+    from backend.app.redis_subscriber import redis_subscriber
+    redis_subscriber.start()
+
+    # start nginx/shared-volume log tailer
+    from backend.app.log_tailer import start_log_tailer
+    await start_log_tailer()
+
+
+
+def build_event(log_line: str, result: dict) -> dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "log_line": log_line,
+        **result
+    }
+
+
+async def persist_and_dispatch(event: dict, db: Session):
+    save_event(event)
+
+    try:
+        create_event(db, event)
+    except Exception as e:
+        print(f"[DB] Failed to save event: {e}")
+
+    if event["is_threat"]:
+        save_alert(event)
+
+        try:
+            create_alert(db, event)
+        except Exception as e:
+            print(f"[DB] Failed to save alert: {e}")
+
+        published = redis_publisher.publish_alert(event)
+
+        if not published:
+            await broadcast_alert(event)
 
 
 @app.get("/")
@@ -39,11 +96,14 @@ def root():
             "/ingest/batch",
             "/pipeline/ingest",
             "/pipeline/status",
+            "/events",
+            "/events/{event_id}/review",
             "/threats",
             "/stats",
             "/models/status",
             "/models/reload",
-            "/models/retrain"
+            "/models/retrain",
+            "/infra/status"
         ],
         "websocket": "/ws/alerts"
     }
@@ -54,6 +114,14 @@ def health():
     return {
         "status": "ok",
         "version": APP_VERSION
+    }
+
+
+@app.get("/infra/status", dependencies=[Depends(verify_api_key)])
+def infra_status():
+    return {
+        "database": "enabled",
+        "redis": redis_publisher.status()
     }
 
 
@@ -73,6 +141,7 @@ def models_reload():
 
 @app.post("/models/retrain", dependencies=[Depends(verify_api_key)])
 def models_retrain():
+    
     retrain_models()
     detector = reload_ml_detector()
 
@@ -83,42 +152,28 @@ def models_retrain():
 
 
 @app.post("/analyze", response_model=DetectionResponse, dependencies=[Depends(verify_api_key)])
-async def analyze(request: AnalyzeRequest):
+async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
     result = detect(request.log_line)
+    event = build_event(request.log_line, result)
 
-    event = {
-        "log_line": request.log_line,
-        **result
-    }
-
-    save_event(event)
-
-    if result["is_threat"]:
-        save_alert(event)
-        await broadcast_alert(event)
+    await persist_and_dispatch(event, db)
 
     return result
 
 
 @app.post("/ingest/batch", response_model=BatchDetectionResponse, dependencies=[Depends(verify_api_key)])
-async def ingest_batch(request: BatchAnalyzeRequest):
+async def ingest_batch(request: BatchAnalyzeRequest, db: Session = Depends(get_db)):
     results = []
     threats_detected = 0
 
     for log_line in request.log_lines:
         result = detect(log_line)
+        event = build_event(log_line, result)
 
-        event = {
-            "log_line": log_line,
-            **result
-        }
-
-        save_event(event)
+        await persist_and_dispatch(event, db)
 
         if result["is_threat"]:
             threats_detected += 1
-            save_alert(event)
-            await broadcast_alert(event)
 
         results.append(result)
 
@@ -156,25 +211,103 @@ def pipeline_status():
     }
 
 
-@app.get("/threats", dependencies=[Depends(verify_api_key)])
-def threats(limit: int = 100):
+@app.get("/events", dependencies=[Depends(verify_api_key)])
+def events(limit: int = 100, db: Session = Depends(get_db)):
+    try:
+        db_events = list_events(db, limit)
+
+        return {
+            "count": len(db_events),
+            "events": [
+                {
+                    "id": e.id,
+                    "log_line": e.log_line,
+                    "is_threat": e.is_threat,
+                    "threat_type": e.threat_type,
+                    "severity": e.severity,
+                    "score": e.score,
+                    "rule_score": e.rule_score,
+                    "ml_score": e.ml_score,
+                    "matched_rules": e.matched_rules,
+                    "extracted_features": e.extracted_features,
+                    "detection_mode": e.detection_mode,
+                    "reviewed_label": e.reviewed_label,
+                    "created_at": str(e.created_at)
+                }
+                for e in db_events
+            ]
+        }
+
+    except Exception as e:
+        return {
+            "count": len(get_events(limit)),
+            "events": get_events(limit),
+            "fallback": "memory",
+            "error": str(e)
+        }
+
+
+@app.post("/events/{event_id}/review", dependencies=[Depends(verify_api_key)])
+def review(event_id: str, reviewed_label: int, db: Session = Depends(get_db)):
+    if reviewed_label not in [0, 1]:
+        raise HTTPException(status_code=400, detail="reviewed_label must be 0 or 1")
+
+    event = review_event(db, event_id, reviewed_label)
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
     return {
-        "count": len(get_alerts(limit)),
-        "alerts": get_alerts(limit)
+        "status": "reviewed",
+        "event_id": event.id,
+        "reviewed_label": event.reviewed_label
     }
+
+
+@app.get("/threats", dependencies=[Depends(verify_api_key)])
+def threats(limit: int = 100, db: Session = Depends(get_db)):
+    try:
+        db_alerts = list_alerts(db, limit)
+
+        return {
+            "count": len(db_alerts),
+            "alerts": [
+                {
+                    "id": a.id,
+                    "event_id": a.event_id,
+                    "threat_type": a.threat_type,
+                    "severity": a.severity,
+                    "score": a.score,
+                    "payload": a.payload,
+                    "created_at": str(a.created_at)
+                }
+                for a in db_alerts
+            ]
+        }
+
+    except Exception as e:
+        return {
+            "count": len(get_alerts(limit)),
+            "alerts": get_alerts(limit),
+            "fallback": "memory",
+            "error": str(e)
+        }
 
 
 @app.get("/alerts", dependencies=[Depends(verify_api_key)])
-def alerts(limit: int = 100):
-    return {
-        "count": len(get_alerts(limit)),
-        "alerts": get_alerts(limit)
-    }
+def alerts(limit: int = 100, db: Session = Depends(get_db)):
+    return threats(limit, db)
 
 
 @app.get("/stats", dependencies=[Depends(verify_api_key)])
-def stats():
-    return get_stats()
+def stats(db: Session = Depends(get_db)):
+    try:
+        return db_stats(db)
+    except Exception as e:
+        memory_stats = get_stats()
+        memory_stats["fallback"] = "memory"
+        memory_stats["error"] = str(e)
+        return memory_stats
 
 
 @app.websocket("/ws/alerts")

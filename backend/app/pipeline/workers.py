@@ -1,10 +1,13 @@
-import asyncio
 import uuid
 
 from backend.app.parser import parse_nginx_log
 from backend.app.features import extract_features
 from backend.app.detector import detect
 from backend.app.storage import save_event, save_alert
+from backend.app.alerts import broadcast_alert
+from backend.app.redis_client import redis_publisher
+from backend.app.db.database import SessionLocal
+from backend.app.db.repository import create_event, create_alert
 
 from backend.app.pipeline.queue import (
     raw_queue,
@@ -13,7 +16,6 @@ from backend.app.pipeline.queue import (
     detection_queue
 )
 
-from backend.app.alerts import broadcast_alert
 
 async def raw_worker():
     while True:
@@ -58,13 +60,29 @@ async def detection_worker():
 
         full_event = {
             **event,
-            **result
+            **result,
+            "extracted_features": result.get("extracted_features", event.get("features", {})),
+            "parsed": event.get("parsed", {})
         }
 
-        save_event(full_event)
+        db = SessionLocal()
 
-        if result["is_threat"]:
-            save_alert(full_event)
-            await broadcast_alert(full_event)
+        try:
+            save_event(full_event)
+            create_event(db, full_event)
 
-        detection_queue.task_done()
+            if result["is_threat"]:
+                save_alert(full_event)
+                create_alert(db, full_event)
+
+                published = redis_publisher.publish_alert(full_event)
+
+                if not published:
+                    await broadcast_alert(full_event)
+
+        except Exception as e:
+            print(f"[Pipeline] Error while saving/dispatching event: {e}")
+
+        finally:
+            db.close()
+            detection_queue.task_done()

@@ -6,3 +6,9 @@ pandas
 numpy
 scikit-learn
 joblib
+sqlalchemy
+psycopg2-binary
+redis
+onnxruntime
+websockets
+requests
