@@ -22,11 +22,16 @@ services:
       - ./models:/app/models
       - ./data:/app/data
       - ./dev-log:/logs
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: ai-threat-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
   postgres:
     image: postgres:16

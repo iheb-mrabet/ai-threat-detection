@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from backend.app.config import APP_NAME, APP_VERSION
@@ -11,6 +12,8 @@ from backend.app.schemas import (
     DetectionResponse,
     BatchDetectionResponse
 )
+
+
 from backend.app.detector import detect
 from backend.app.storage import save_alert, save_event, get_alerts, get_stats, get_events
 from backend.app.pipeline.queue import raw_queue
@@ -36,6 +39,15 @@ app = FastAPI(
     description="Advanced nginx log threat detection system with rule-based detection, ML ensemble, ONNX inference, and persistent storage.",
     version=APP_VERSION
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 @app.on_event("startup")
