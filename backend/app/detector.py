@@ -1,10 +1,12 @@
 from typing import Dict, List
+
 from backend.app.parser import parse_nginx_log
 from backend.app.features import extract_features
 from backend.app.rules import apply_rules
+from backend.ml.inference import ml_detector
 
 
-def calculate_score(features: Dict[str, float], matched_rules: List[str]) -> float:
+def calculate_rule_score(features: Dict[str, float], matched_rules: List[str]) -> float:
     score = 0.0
 
     score += len(matched_rules) * 0.22
@@ -34,13 +36,20 @@ def calculate_score(features: Dict[str, float], matched_rules: List[str]) -> flo
 
 
 def severity_from_score(score: float) -> str:
-    if score >= 0.85:
+    if score >= 0.90:
         return "critical"
-    if score >= 0.60:
+    if score >= 0.70:
         return "high"
-    if score >= 0.35:
+    if score >= 0.40:
         return "medium"
     return "low"
+
+
+def final_decision(rule_score: float, ml_score: float, matched_rules: List[str]) -> float:
+    if matched_rules:
+        return round(max(rule_score, ml_score), 4)
+
+    return round((0.45 * rule_score) + (0.55 * ml_score), 4)
 
 
 def detect(log_line: str) -> Dict:
@@ -48,15 +57,22 @@ def detect(log_line: str) -> Dict:
     features = extract_features(parsed)
     matched_rules = apply_rules(parsed)
 
-    score = calculate_score(features, matched_rules)
-    is_threat = score >= 0.35 or len(matched_rules) > 0
+    rule_score = calculate_rule_score(features, matched_rules)
+    ml_result = ml_detector.predict(features)
+    ml_score = ml_result["ml_score"]
 
-    threat_type = ", ".join(matched_rules) if matched_rules else "normal"
-    severity = severity_from_score(score)
+    final_score = final_decision(rule_score, ml_score, matched_rules)
+    is_threat = final_score >= 0.40 or len(matched_rules) > 0
+
+    threat_type = ", ".join(matched_rules) if matched_rules else "ML Anomaly" if is_threat else "normal"
+    severity = severity_from_score(final_score)
+
+    detection_mode = "rules+ml" if ml_result["ml_ready"] == 1.0 else "rules_only"
 
     explanation = (
-        f"Detected as {threat_type} with score {score}. "
-        f"Severity={severity}. "
+        f"Detection mode={detection_mode}. "
+        f"Rule score={rule_score}. ML score={ml_score}. Final score={final_score}. "
+        f"Threat type={threat_type}. Severity={severity}. "
         f"Matched rules={matched_rules if matched_rules else 'none'}."
     )
 
@@ -64,7 +80,13 @@ def detect(log_line: str) -> Dict:
         "is_threat": is_threat,
         "threat_type": threat_type,
         "severity": severity,
-        "score": score,
+        "score": final_score,
+        "rule_score": rule_score,
+        "ml_score": ml_score,
+        "rf_score": ml_result["rf_score"],
+        "isolation_score": ml_result["isolation_score"],
+        "autoencoder_score": ml_result["autoencoder_score"],
+        "detection_mode": detection_mode,
         "matched_rules": matched_rules,
         "extracted_features": features,
         "explanation": explanation

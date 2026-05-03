@@ -1,0 +1,67 @@
+{
+    "timestamp": "2026-05-03T15:05:42.748417",
+    "metrics": {
+        "f1": 0.8848684210526315,
+        "precision": 0.893687707641196,
+        "recall": 0.8762214983713354,
+        "roc_auc": 0.9854214665925161,
+        "pr_auc": 0.9658804276022332
+    },
+    "features": [
+        "path_length",
+        "num_digits",
+        "num_letters",
+        "num_special_chars",
+        "num_slashes",
+        "num_dots",
+        "num_equals",
+        "num_quotes",
+        "num_percent",
+        "num_ampersand",
+        "has_query",
+        "query_length",
+        "status_code",
+        "is_2xx",
+        "is_3xx",
+        "is_4xx",
+        "is_5xx",
+        "response_size",
+        "log_response_size",
+        "parse_error",
+        "method_get",
+        "method_post",
+        "method_put",
+        "method_delete",
+        "path_entropy",
+        "contains_script",
+        "contains_sql_keyword",
+        "contains_traversal",
+        "contains_command",
+        "contains_ssrf",
+        "contains_log4shell",
+        "contains_sensitive_file",
+        "looks_like_scanner",
+        "suspicious_length",
+        "many_special_chars"
+    ],
+    "ensemble": {
+        "rf_weight": 0.4,
+        "ae_weight": 0.4,
+        "if_weight": 0.2
+    },
+    "status": "valid",
+    "model_version": "d81ba318",
+    "trained_at": "2026-05-03T15:05:42.486683+00:00",
+    "autoencoder_type": "pytorch",
+    "dataset_source": "synthetic_fallback",
+    "calibration": {
+        "ae_threshold_95": 0.6406280991554805,
+        "iso_threshold_95": 0.013452167468011922
+    },
+    "dataset": {
+        "rows": 5000,
+        "features": 35,
+        "attack_ratio": 0.246
+    },
+    "notes": "Retraining prefers stored events with heuristic/reviewed labels. If stored events are insufficient, synthetic fallback data is used."
+}

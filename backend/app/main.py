@@ -13,10 +13,12 @@ from backend.app.storage import save_alert, save_event, get_alerts, get_stats
 from backend.app.pipeline.queue import raw_queue
 from backend.app.pipeline.engine import start_pipeline
 from backend.app.alerts import ACTIVE_WEBSOCKETS, broadcast_alert
+from backend.ml.inference import ml_detector, reload_ml_detector
+from backend.ml.train_classifiers import train as retrain_models
 
 app = FastAPI(
     title=APP_NAME,
-    description="Advanced nginx log threat detection system with rule-based detection and ML-ready architecture.",
+    description="Advanced nginx log threat detection system with rule-based and ML ensemble detection.",
     version=APP_VERSION
 )
 
@@ -38,7 +40,10 @@ def root():
             "/pipeline/ingest",
             "/pipeline/status",
             "/threats",
-            "/stats"
+            "/stats",
+            "/models/status",
+            "/models/reload",
+            "/models/retrain"
         ],
         "websocket": "/ws/alerts"
     }
@@ -49,6 +54,31 @@ def health():
     return {
         "status": "ok",
         "version": APP_VERSION
+    }
+
+
+@app.get("/models/status", dependencies=[Depends(verify_api_key)])
+def models_status():
+    return ml_detector.status()
+
+
+@app.post("/models/reload", dependencies=[Depends(verify_api_key)])
+def models_reload():
+    detector = reload_ml_detector()
+    return {
+        "status": "reloaded",
+        "models": detector.status()
+    }
+
+
+@app.post("/models/retrain", dependencies=[Depends(verify_api_key)])
+def models_retrain():
+    retrain_models()
+    detector = reload_ml_detector()
+
+    return {
+        "status": "retrained",
+        "models": detector.status()
     }
 
 
