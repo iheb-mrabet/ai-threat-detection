@@ -1,0 +1,27 @@
+{
+    "baseline": {
+        "accuracy": 1.0,
+        "FAR": 0.0,
+        "FRR": 0.0
+    },
+    "noise_attack": {
+        "accuracy": 0.8916666666666667,
+        "FAR": 0.15035799522673032,
+        "FRR": 0.011049723756906077
+    },
+    "spoofing_attack": {
+        "accuracy": 0.99,
+        "FAR": 0.0,
+        "FRR": 0.03314917127071823
+    },
+    "compression_attack": {
+        "accuracy": 1.0,
+        "FAR": 0.0,
+        "FRR": 0.0
+    },
+    "adversarial_attack": {
+        "accuracy": 0.9133333333333333,
+        "FAR": 0.12410501193317422,
+        "FRR": 0.0
+    }
+}

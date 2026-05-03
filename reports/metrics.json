@@ -1,0 +1,9 @@
+{
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "FAR": 0.0,
+    "FRR": 0.0,
+    "EER": 0.0
+}
