@@ -13,3 +13,5 @@ frontend/dist/
 *.sqlite3
 .pytest_cache/
 .coverage
+node_modules/
+frontend/node_modules/
