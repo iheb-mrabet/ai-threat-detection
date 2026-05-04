@@ -3,6 +3,7 @@ load_dotenv()
 
 import uuid
 
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -50,6 +51,8 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 
 app.add_middleware(
     CORSMiddleware,
@@ -396,6 +399,7 @@ def monitoring_metrics(db: Session = Depends(get_db)):
         "redis": redis_publisher.status()
     }
 
+from fastapi.staticfiles import StaticFiles
 from fastapi import Form
 from backend.app.auth import authenticate_user, create_access_token
 

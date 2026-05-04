@@ -66,6 +66,16 @@ function Navigation() {
   );
 }
 
+function MetricCard({ title, value, subtitle }) {
+  return (
+    <div className="metric-card">
+      <h3>{title}</h3>
+      <p>{value ?? "N/A"}</p>
+      <small>{subtitle}</small>
+    </div>
+  );
+}
+
 function AttackPage() {
   const [simulationStatus, setSimulationStatus] = useState("");
 
@@ -124,6 +134,8 @@ function DashboardPage() {
   const [events, setEvents] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [modelStatus, setModelStatus] = useState(null);
+  const [securityMetrics, setSecurityMetrics] = useState(null);
+  const [graphSummary, setGraphSummary] = useState(null);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [status, setStatus] = useState("connecting");
 
@@ -133,11 +145,15 @@ function DashboardPage() {
       const eventsRes = await axios.get(`${API_BASE}/events?limit=20`, { headers });
       const alertsRes = await axios.get(`${API_BASE}/threats?limit=20`, { headers });
       const modelRes = await axios.get(`${API_BASE}/models/status`, { headers });
+      const secMetricsRes = await axios.get(`${API_BASE}/models/security-metrics`, { headers });
+      const graphRes = await axios.get(`${API_BASE}/models/metrics-graphs`, { headers });
 
       setStats(statsRes.data);
       setEvents(eventsRes.data.events || []);
       setAlerts(alertsRes.data.alerts || []);
       setModelStatus(modelRes.data);
+      setSecurityMetrics(secMetricsRes.data.metrics || null);
+      setGraphSummary(graphRes.data.summary || null);
     } catch (error) {
       console.error(error);
       setStatus("api_error");
@@ -172,6 +188,8 @@ function DashboardPage() {
     if (severity === "medium") return "severity medium";
     return "severity low";
   };
+
+  const cm = securityMetrics?.confusion_matrix || {};
 
   return (
     <div className="app">
@@ -211,6 +229,70 @@ function DashboardPage() {
       </section>
 
       <section className="panel">
+        <h2>Security Evaluation Metrics</h2>
+        <p className="muted">
+          FAR, FRR and EER are calculated automatically from labeled data and model predictions.
+        </p>
+
+        <div className="metrics-grid">
+          <MetricCard title="FAR" value={securityMetrics?.FAR} subtitle="False alerts on normal traffic" />
+          <MetricCard title="FRR" value={securityMetrics?.FRR} subtitle="Missed attacks" />
+          <MetricCard title="EER" value={securityMetrics?.EER} subtitle="Balance point between FAR and FRR" />
+          <MetricCard title="EER Threshold" value={securityMetrics?.EER_threshold} subtitle="Decision threshold at EER" />
+          <MetricCard title="Precision" value={securityMetrics?.precision} subtitle="Correctness of alerts" />
+          <MetricCard title="Recall" value={securityMetrics?.recall} subtitle="Attack detection coverage" />
+          <MetricCard title="F1 Score" value={securityMetrics?.f1_score} subtitle="Precision/recall balance" />
+          <MetricCard title="ROC-AUC" value={securityMetrics?.roc_auc} subtitle="Attack/normal separation" />
+          <MetricCard title="PR-AUC" value={securityMetrics?.pr_auc} subtitle="Precision-recall quality" />
+        </div>
+
+        <h3>Confusion Matrix</h3>
+        <div className="confusion-grid">
+          <div className="confusion-box good">
+            <strong>TP</strong>
+            <span>{cm.TP ?? "N/A"}</span>
+            <small>Detected attacks</small>
+          </div>
+          <div className="confusion-box warning">
+            <strong>FP</strong>
+            <span>{cm.FP ?? "N/A"}</span>
+            <small>False alerts</small>
+          </div>
+          <div className="confusion-box warning">
+            <strong>FN</strong>
+            <span>{cm.FN ?? "N/A"}</span>
+            <small>Missed attacks</small>
+          </div>
+          <div className="confusion-box good">
+            <strong>TN</strong>
+            <span>{cm.TN ?? "N/A"}</span>
+            <small>Correct normal traffic</small>
+          </div>
+        </div>
+
+        <h3>Evaluation Graphs</h3>
+        <div className="graphs-grid">
+          <div className="graph-card">
+            <h4>ROC Curve</h4>
+            <img src={`${API_BASE}/reports/roc_curve.png`} alt="ROC Curve" />
+          </div>
+
+          <div className="graph-card">
+            <h4>FAR / FRR / EER Curve</h4>
+            <img src={`${API_BASE}/reports/far_frr_eer_curve.png`} alt="FAR FRR EER Curve" />
+          </div>
+
+          <div className="graph-card">
+            <h4>Precision-Recall Curve</h4>
+            <img src={`${API_BASE}/reports/precision_recall_curve.png`} alt="Precision Recall Curve" />
+          </div>
+        </div>
+
+        <h3>Graph Summary</h3>
+        <pre>{JSON.stringify(graphSummary || {}, null, 2)}</pre>
+      </section>
+
+      <section className="panel">
         <h2>Model Information</h2>
         <div className="model-grid">
           <div>
@@ -218,7 +300,7 @@ function DashboardPage() {
             <pre>{JSON.stringify(modelStatus?.inference_backend || {}, null, 2)}</pre>
           </div>
           <div>
-            <strong>Metrics:</strong>
+            <strong>Training Metrics:</strong>
             <pre>{JSON.stringify(modelStatus?.metadata?.metrics || {}, null, 2)}</pre>
           </div>
           <div>

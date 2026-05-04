@@ -271,3 +271,113 @@ td {
     grid-template-columns: 1fr;
   }
 }
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.metric-card h3 {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 15px;
+}
+
+.metric-card p {
+  margin: 10px 0;
+  font-size: 30px;
+  font-weight: 900;
+  color: #e5e7eb;
+}
+
+.metric-card small {
+  color: #94a3b8;
+}
+
+.confusion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 14px 0 24px;
+}
+
+.confusion-box {
+  border-radius: 16px;
+  padding: 18px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  text-align: center;
+}
+
+.confusion-box strong {
+  display: block;
+  font-size: 16px;
+  color: #bfdbfe;
+}
+
+.confusion-box span {
+  display: block;
+  font-size: 30px;
+  font-weight: 900;
+  margin: 8px 0;
+}
+
+.confusion-box small {
+  color: #94a3b8;
+}
+
+.confusion-box.good {
+  border-color: #14532d;
+}
+
+.confusion-box.warning {
+  border-color: #7c2d12;
+}
+
+@media (max-width: 900px) {
+  .metrics-grid,
+  .confusion-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.graphs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 18px 0 24px;
+}
+
+.graph-card {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.graph-card h4 {
+  margin: 0 0 12px;
+  color: #bfdbfe;
+}
+
+.graph-card img {
+  width: 100%;
+  border-radius: 12px;
+  background: white;
+}
+
+@media (max-width: 900px) {
+  .graphs-grid {
+    grid-template-columns: 1fr;
+  }
+}
