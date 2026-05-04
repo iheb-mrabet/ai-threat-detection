@@ -5,6 +5,21 @@ import "./App.css";
 const API_BASE = "http://127.0.0.1:8000";
 const API_KEY = "dev-secret-key";
 
+function authHeaders() {
+  const token = localStorage.getItem("jwt_token");
+
+  if (token) {
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  return {
+    "X-API-Key": API_KEY,
+  };
+}
+
+
 const headers = {
   "X-API-Key": API_KEY,
 };
@@ -62,6 +77,15 @@ function Navigation() {
     <nav className="nav">
       <a href="/">Dashboard</a>
       <a href="/attacks">Attack Simulations</a>
+      <button
+        className="logout-btn"
+        onClick={() => {
+          localStorage.removeItem("jwt_token");
+          window.location.href = "/login";
+        }}
+      >
+        Logout
+      </button>
     </nav>
   );
 }
@@ -86,7 +110,7 @@ function AttackPage() {
       const response = await axios.post(
         `${API_BASE}/analyze`,
         { log_line: simulation.log_line },
-        { headers }
+        { headers: authHeaders() }
       );
 
       setSimulationStatus(
@@ -141,12 +165,12 @@ function DashboardPage() {
 
   async function loadData() {
     try {
-      const statsRes = await axios.get(`${API_BASE}/stats`, { headers });
-      const eventsRes = await axios.get(`${API_BASE}/events?limit=20`, { headers });
-      const alertsRes = await axios.get(`${API_BASE}/threats?limit=20`, { headers });
-      const modelRes = await axios.get(`${API_BASE}/models/status`, { headers });
-      const secMetricsRes = await axios.get(`${API_BASE}/models/security-metrics`, { headers });
-      const graphRes = await axios.get(`${API_BASE}/models/metrics-graphs`, { headers });
+      const statsRes = await axios.get(`${API_BASE}/stats`, { headers: authHeaders() });
+      const eventsRes = await axios.get(`${API_BASE}/events?limit=20`, { headers: authHeaders() });
+      const alertsRes = await axios.get(`${API_BASE}/threats?limit=20`, { headers: authHeaders() });
+      const modelRes = await axios.get(`${API_BASE}/models/status`, { headers: authHeaders() });
+      const secMetricsRes = await axios.get(`${API_BASE}/models/security-metrics`, { headers: authHeaders() });
+      const graphRes = await axios.get(`${API_BASE}/models/metrics-graphs`, { headers: authHeaders() });
 
       setStats(statsRes.data);
       setEvents(eventsRes.data.events || []);
@@ -381,7 +405,67 @@ function DashboardPage() {
   );
 }
 
+
+function LoginPage() {
+  const [username, setUsername] = useState("iheb");
+  const [password, setPassword] = useState("iheb");
+  const [error, setError] = useState("");
+
+  async function handleLogin(e) {
+    e.preventDefault();
+
+    try {
+      const form = new URLSearchParams();
+      form.append("username", username);
+      form.append("password", password);
+
+      const response = await axios.post(`${API_BASE}/auth/login`, form, {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      localStorage.setItem("jwt_token", response.data.access_token);
+      window.location.href = "/";
+    } catch (err) {
+      console.error(err);
+      setError("Invalid username or password");
+    }
+  }
+
+  return (
+    <div className="app login-page">
+      <div className="login-card">
+        <h1>AI Threat Detection Login</h1>
+        <p>Authenticate to access the security dashboard.</p>
+
+        <form onSubmit={handleLogin}>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+          />
+
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            type="password"
+          />
+
+          <button type="submit">Login</button>
+        </form>
+
+        {error && <div className="login-error">{error}</div>}
+
+        <small>Default credentials: iheb / iheb</small>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+
   const path = window.location.pathname;
 
   if (path === "/attacks") {

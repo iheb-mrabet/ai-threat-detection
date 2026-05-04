@@ -4,13 +4,14 @@ load_dotenv()
 import uuid
 
 from fastapi.staticfiles import StaticFiles
+from backend.app.deps import get_current_user
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from backend.app.config import APP_NAME, APP_VERSION
 from backend.app.logger import logger
-from backend.app.security import verify_api_key
+from backend.app.security import verify_api_key, verify_auth
 from backend.app.schemas import (
     AnalyzeRequest,
     BatchAnalyzeRequest,
@@ -143,7 +144,7 @@ def health():
     }
 
 
-@app.get("/infra/status", dependencies=[Depends(verify_api_key)])
+@app.get("/infra/status", dependencies=[Depends(verify_auth)])
 def infra_status():
     return {
         "database": "enabled",
@@ -151,12 +152,12 @@ def infra_status():
     }
 
 
-@app.get("/models/status", dependencies=[Depends(verify_api_key)])
+@app.get("/models/status", dependencies=[Depends(verify_auth)])
 def models_status():
     return ml_detector.status()
 
 
-@app.post("/models/reload", dependencies=[Depends(verify_api_key)])
+@app.post("/models/reload", dependencies=[Depends(verify_auth)])
 def models_reload():
     detector = reload_ml_detector()
     return {
@@ -165,7 +166,7 @@ def models_reload():
     }
 
 
-@app.post("/models/retrain", dependencies=[Depends(verify_api_key)])
+@app.post("/models/retrain", dependencies=[Depends(verify_auth)])
 def models_retrain():
     
     retrain_models()
@@ -177,7 +178,7 @@ def models_retrain():
     }
 
 
-@app.post("/analyze", response_model=DetectionResponse, dependencies=[Depends(verify_api_key)])
+@app.post("/analyze", response_model=DetectionResponse, dependencies=[Depends(verify_auth)])
 @limiter.limit("100/minute")
 async def analyze(request: Request, payload: AnalyzeRequest, db: Session = Depends(get_db)):
     result = detect(payload.log_line)
@@ -192,7 +193,7 @@ async def analyze(request: Request, payload: AnalyzeRequest, db: Session = Depen
     return result
 
 
-@app.post("/ingest/batch", response_model=BatchDetectionResponse, dependencies=[Depends(verify_api_key)])
+@app.post("/ingest/batch", response_model=BatchDetectionResponse, dependencies=[Depends(verify_auth)])
 async def ingest_batch(request: BatchAnalyzeRequest, db: Session = Depends(get_db)):
     results = []
     threats_detected = 0
@@ -218,7 +219,7 @@ async def ingest_batch(request: BatchAnalyzeRequest, db: Session = Depends(get_d
     }
 
 
-@app.post("/pipeline/ingest", dependencies=[Depends(verify_api_key)])
+@app.post("/pipeline/ingest", dependencies=[Depends(verify_auth)])
 async def pipeline_ingest(request: AnalyzeRequest):
     await raw_queue.put(request.log_line)
 
@@ -228,7 +229,7 @@ async def pipeline_ingest(request: AnalyzeRequest):
     }
 
 
-@app.get("/pipeline/status", dependencies=[Depends(verify_api_key)])
+@app.get("/pipeline/status", dependencies=[Depends(verify_auth)])
 def pipeline_status():
     from backend.app.pipeline.queue import (
         raw_queue,
@@ -245,7 +246,7 @@ def pipeline_status():
     }
 
 
-@app.get("/events", dependencies=[Depends(verify_api_key)])
+@app.get("/events", dependencies=[Depends(verify_auth)])
 def events(limit: int = 100, db: Session = Depends(get_db)):
     try:
         db_events = list_events(db, limit)
@@ -281,7 +282,7 @@ def events(limit: int = 100, db: Session = Depends(get_db)):
         }
 
 
-@app.post("/events/{event_id}/review", dependencies=[Depends(verify_api_key)])
+@app.post("/events/{event_id}/review", dependencies=[Depends(verify_auth)])
 def review(event_id: str, reviewed_label: int, db: Session = Depends(get_db)):
     if reviewed_label not in [0, 1]:
         raise HTTPException(status_code=400, detail="reviewed_label must be 0 or 1")
@@ -298,7 +299,7 @@ def review(event_id: str, reviewed_label: int, db: Session = Depends(get_db)):
     }
 
 
-@app.get("/threats", dependencies=[Depends(verify_api_key)])
+@app.get("/threats", dependencies=[Depends(verify_auth)])
 def threats(limit: int = 100, db: Session = Depends(get_db)):
     try:
         db_alerts = list_alerts(db, limit)
@@ -328,12 +329,12 @@ def threats(limit: int = 100, db: Session = Depends(get_db)):
         }
 
 
-@app.get("/alerts", dependencies=[Depends(verify_api_key)])
+@app.get("/alerts", dependencies=[Depends(verify_auth)])
 def alerts(limit: int = 100, db: Session = Depends(get_db)):
     return threats(limit, db)
 
 
-@app.get("/stats", dependencies=[Depends(verify_api_key)])
+@app.get("/stats", dependencies=[Depends(verify_auth)])
 def stats(db: Session = Depends(get_db)):
     try:
         return db_stats(db)
@@ -375,7 +376,7 @@ def rate_limit_handler(request, exc):
 def monitoring_health():
     return {"status": "ok", "service": "ai-threat-detection"}
 
-@app.get("/monitoring/metrics", dependencies=[Depends(verify_api_key)])
+@app.get("/monitoring/metrics", dependencies=[Depends(verify_auth)])
 def monitoring_metrics(db: Session = Depends(get_db)):
     return {
         "service": "ai-threat-detection",
@@ -389,7 +390,7 @@ def monitoring_metrics(db: Session = Depends(get_db)):
 def monitoring_health():
     return {"status": "ok", "service": "ai-threat-detection"}
 
-@app.get("/monitoring/metrics", dependencies=[Depends(verify_api_key)])
+@app.get("/monitoring/metrics", dependencies=[Depends(verify_auth)])
 def monitoring_metrics(db: Session = Depends(get_db)):
     return {
         "service": "ai-threat-detection",
@@ -400,6 +401,7 @@ def monitoring_metrics(db: Session = Depends(get_db)):
     }
 
 from fastapi.staticfiles import StaticFiles
+from backend.app.deps import get_current_user
 from fastapi import Form
 from backend.app.auth import authenticate_user, create_access_token
 
@@ -412,7 +414,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": username})
     return {"access_token": token, "token_type": "bearer"}
 
-@app.get("/models/metrics-graphs", dependencies=[Depends(verify_api_key)])
+@app.get("/models/metrics-graphs", dependencies=[Depends(verify_auth)])
 def get_metrics_graphs():
     import json
     import os
@@ -431,7 +433,7 @@ def get_metrics_graphs():
             "summary": json.load(f)
         }
 
-@app.get("/models/security-metrics", dependencies=[Depends(verify_api_key)])
+@app.get("/models/security-metrics", dependencies=[Depends(verify_auth)])
 def get_security_metrics():
     import json
     import os

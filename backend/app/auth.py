@@ -3,12 +3,12 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
-SECRET_KEY = os.getenv("JWT_SECRET", "dev-jwt-secret")
+SECRET_KEY = os.getenv("JWT_SECRET", "super-secure-jwt-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "iheb")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "iheb")
 
 
 def hash_password(password: str) -> str:
@@ -18,18 +18,18 @@ def hash_password(password: str) -> str:
 ADMIN_PASSWORD_HASH = hash_password(ADMIN_PASSWORD)
 
 
-def verify_password(plain_password: str, password_hash: str) -> bool:
-    return hash_password(plain_password) == password_hash
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return hash_password(plain_password) == hashed_password
 
 
 def authenticate_user(username: str, password: str):
     if username != ADMIN_USERNAME:
-        return False
+        return None
 
     if not verify_password(password, ADMIN_PASSWORD_HASH):
-        return False
+        return None
 
-    return {"username": username}
+    return {"username": username, "role": "admin"}
 
 
 def create_access_token(data: dict):
