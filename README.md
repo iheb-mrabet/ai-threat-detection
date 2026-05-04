@@ -1,72 +1,147 @@
 # AI Threat Detection Platform
 
-A real-time web threat detection system that analyzes nginx access logs and detects malicious HTTP behavior using both rule-based logic and machine learning.
+A real-time web threat detection platform that analyzes nginx access logs and detects malicious HTTP behavior using a hybrid detection engine combining rules, machine learning, anomaly detection, and live alerting.
 
-The project simulates how a security monitoring platform can protect web applications and APIs by observing incoming traffic, detecting attacks, storing events, and showing live alerts in a dashboard.
+This project simulates a lightweight SOC/SIEM-style system for web application security monitoring.
+
+---
+
+## Why this project
+
+Most cybersecurity ML projects stop at offline model training.
+
+This project goes further by building a complete end-to-end system:
+
+- real-time log analysis
+- hybrid detection engine
+- attack simulation interface
+- live WebSocket alerts
+- persistent event storage
+- security evaluation metrics
+- visual performance graphs
+- JWT-protected dashboard
+- Dockerized full-stack deployment
+
+The goal is not only to detect attacks, but also to prove how well the system performs.
+
+---
 
 ## What is being protected?
 
 The system is designed to protect web applications and APIs exposed over HTTP.
 
-In practice, it monitors nginx access logs. These logs represent requests reaching a backend service such as Flask, Django, Node.js, or any API.
+It monitors nginx access logs, which represent incoming traffic to a backend application such as Flask, Django, Node.js, PHP, or any API service.
 
 Protection model:
 
 User / Attacker -> HTTP Request -> nginx -> Detection System -> Application
 
-The system does not replace nginx. It analyzes nginx logs to detect attacks targeting the application behind it.
+The detector does not replace nginx. It analyzes nginx logs to detect attacks targeting the application behind it.
 
-## Main Features
+---
 
-- Real-time nginx log analysis
-- Hybrid detection using rules and machine learning
-- SQL Injection detection
-- XSS detection
-- Path Traversal detection
-- Command Injection detection
-- SSRF detection
-- Log4Shell detection
-- Noisy and encoded payload detection
-- WebSocket live alerts
-- PostgreSQL event storage
-- Redis pub/sub streaming
-- React dashboard
-- Separate attack simulation page
-- JWT login authentication
-- API key support
-- FAR, FRR, EER security metrics
+## Features
+
+### Detection
+
+- Real-time nginx-style log analysis
+- Rule-based attack detection
+- Machine learning classification
+- Anomaly detection
+- ONNX Runtime inference
+- Threat scoring and severity classification
+
+### Supported attack simulations
+
+- SQL Injection
+- Cross-Site Scripting
+- Path Traversal
+- Command Injection
+- SSRF
+- Log4Shell
+- Spoofing-like behavior
+- Noisy payloads
+- Encoded / obfuscated payloads
+
+### Dashboard
+
+- JWT login
+- Live WebSocket alerts
+- Recent threats
+- Recent events
+- Model status
+- Security evaluation metrics
+- Confusion matrix
 - ROC, Precision-Recall, and FAR/FRR/EER graphs
-- Docker Compose deployment
+- Separate attack simulation page
+
+### Infrastructure
+
+- FastAPI backend
+- React frontend
+- PostgreSQL database
+- Redis pub/sub
+- Docker Compose
+- nginx frontend serving
+- API key support
+- JWT authentication
+
+---
 
 ## Detection Engine
 
-The detection engine combines several methods:
+The detection engine uses a hybrid approach.
 
-- Rule-based detection for known attack signatures
+### Rule-based detection
+
+Rules detect known attack patterns such as:
+
+- SQL keywords
+- script tags
+- path traversal patterns
+- SSRF indicators
+- Log4Shell payloads
+- suspicious command patterns
+
+### Machine learning models
+
+The ML layer combines:
+
 - Random Forest for supervised classification
 - Isolation Forest for anomaly detection
-- Autoencoder exported to ONNX for anomaly scoring
+- Autoencoder for reconstruction-based anomaly scoring
+- ONNX Runtime for portable inference
 
-Each request is converted into numerical features before being analyzed.
+Each HTTP request is transformed into numerical features before detection.
 
 Examples of extracted features:
 
-- Path length
-- Number of special characters
-- Query length
+- path length
+- number of digits
+- number of special characters
+- query length
 - HTTP status code
-- Response size
-- Path entropy
+- response size
+- path entropy
 - SQL keyword presence
-- Script tag presence
+- script tag presence
 - SSRF indicator
 - Log4Shell indicator
+
+---
 
 ## Security Evaluation
 
 The system evaluates itself using labeled data and real model predictions.
 
-The dashboard displays:
+Metrics are computed automatically from the confusion matrix:
+
+- TP: correctly detected attacks
+- TN: correctly detected normal requests
+- FP: false alerts
+- FN: missed attacks
+
+Current evaluation metrics:
 
 - FAR: False Acceptance Rate
 - FRR: False Rejection Rate
@@ -76,15 +151,16 @@ The dashboard displays:
 - F1-score
 - ROC-AUC
 - PR-AUC
-- Confusion matrix
 
-These values are calculated from TP, TN, FP, and FN. They are not hardcoded.
-
-The dashboard also displays generated evaluation graphs:
+The dashboard also displays generated graphs:
 
 - ROC Curve
 - Precision-Recall Curve
 - FAR / FRR / EER Curve
+
+These values are not hardcoded. They are calculated from model predictions on labeled data.
+
+---
 
 ## Architecture
 
@@ -97,49 +173,91 @@ nginx access logs
 -> WebSocket  
 -> React dashboard  
 
+---
+
+## Screenshots
+
+Create the following screenshots after running the project:
+
+- `screenshots/dashboard.png`
+- `screenshots/attacks.png`
+- `screenshots/metrics.png`
+
+Then uncomment or update these lines:
+
+Dashboard:
+
+![Dashboard](screenshots/dashboard.png)
+
+Attack simulation page:
+
+![Attack Simulation](screenshots/attacks.png)
+
+Security metrics and graphs:
+
+![Security Metrics](screenshots/metrics.png)
+
+---
+
 ## Tech Stack
 
 Backend:
 
-- FastAPI
 - Python
+- FastAPI
 - scikit-learn
 - ONNX Runtime
+- PostgreSQL
+- Redis
 
 Frontend:
 
 - React
 - Vite
-- Nginx
+- nginx
 
 Infrastructure:
 
-- PostgreSQL
-- Redis
+- Docker
 - Docker Compose
+
+---
 
 ## Authentication
 
-The platform includes JWT login authentication and API key support.
+The platform includes:
 
-Default login:
+- JWT login authentication
+- API key support for service-level access
+
+Default demo credentials:
 
 Username: iheb  
 Password: iheb  
 
 After login, the dashboard uses a JWT token to access protected backend endpoints.
 
+---
+
 ## Running the Project
 
-Start the full stack with:
+Start the full stack:
 
 `docker compose up --build`
 
-Dashboard: http://127.0.0.1:3000
+Open the dashboard:
 
-Attack simulation page: http://127.0.0.1:3000/attacks
+http://127.0.0.1:3000
 
-API: http://127.0.0.1:8000
+Open the attack simulation page:
+
+http://127.0.0.1:3000/attacks
+
+Backend API:
+
+http://127.0.0.1:8000
+
+---
 
 ## Demo Workflow
 
@@ -147,13 +265,86 @@ API: http://127.0.0.1:8000
 2. Open the dashboard.
 3. Login with the default credentials.
 4. Open the attack simulation page.
-5. Trigger attacks such as SQL Injection, XSS, SSRF, Log4Shell, noise, or encoded payloads.
+5. Trigger an attack.
 6. Watch the dashboard update in real time.
-7. Review alerts, metrics, confusion matrix, and evaluation graphs.
+7. Review alerts, scores, metrics, confusion matrix, and evaluation graphs.
+
+---
+
+## Useful API Endpoints
+
+Health check:
+
+`GET /health`
+
+Analyze a log:
+
+`POST /analyze`
+
+Statistics:
+
+`GET /stats`
+
+Recent events:
+
+`GET /events`
+
+Recent threats:
+
+`GET /threats`
+
+Model status:
+
+`GET /models/status`
+
+Security metrics:
+
+`GET /models/security-metrics`
+
+Metrics graph summary:
+
+`GET /models/metrics-graphs`
+
+Live alerts:
+
+`WebSocket /ws/alerts`
+
+---
+
+## Project Highlights
+
+This project demonstrates:
+
+- real-time security monitoring
+- full-stack system design
+- practical ML integration
+- anomaly detection
+- model evaluation
+- live alerting
+- API authentication
+- Dockerized deployment
+- dashboard visualization
+
+---
+
+## Future Improvements
+
+- Replace synthetic fallback data with larger real-world nginx datasets
+- Add user roles and RBAC
+- Add alert notifications through Slack, Discord, or email
+- Add Prometheus and Grafana dashboards
+- Add Kafka for scalable streaming
+- Add Kubernetes deployment
+- Add CI/CD deployment pipeline
+- Add multi-tenant monitoring support
+
+---
 
 ## Author
 
 Iheb Mrabet
+
+---
 
 ## Note
 
