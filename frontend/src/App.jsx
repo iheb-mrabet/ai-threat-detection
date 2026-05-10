@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
+import LoginQR from "./LoginQR";
+import MobileLogin from "./MobileLogin";
+import RegisterPasskey from "./RegisterPasskey";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = `${window.location.origin}/api`;
 const API_KEY = "dev-secret-key";
 
 function authHeaders() {
@@ -187,7 +190,8 @@ function DashboardPage() {
   useEffect(() => {
     loadData();
 
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws/alerts");
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/api/ws/alerts`);
 
     ws.onopen = () => setStatus("connected");
 
@@ -465,10 +469,30 @@ function LoginPage() {
 }
 
 function App() {
+  const currentPath = window.location.pathname;
+  const isAuthenticated = Boolean(localStorage.getItem("jwt_token"));
 
-  const path = window.location.pathname;
+  if (currentPath === "/login-qr") {
+    return <LoginQR />;
+  }
 
-  if (path === "/attacks") {
+  if (currentPath === "/register-passkey") {
+    return <RegisterPasskey />;
+  }
+
+  if (currentPath.startsWith("/mobile-login/")) {
+    return <MobileLogin />;
+  }
+
+  if (currentPath === "/login") {
+    return <LoginPage />;
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  if (currentPath === "/attacks") {
     return <AttackPage />;
   }
 

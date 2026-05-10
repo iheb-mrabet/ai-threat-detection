@@ -21,3 +21,4 @@ passlib[bcrypt]
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+webauthn

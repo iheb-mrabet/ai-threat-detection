@@ -450,3 +450,25 @@ td {
 .logout-btn {
   margin-left: auto;
 }
+
+.graph-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.graph-card img {
+  transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease;
+  cursor: zoom-in;
+}
+
+.graph-card:hover {
+  border-color: #60a5fa;
+  box-shadow: 0 0 35px rgba(96, 165, 250, 0.25);
+}
+
+.graph-card:hover img {
+  transform: scale(1.18);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  filter: contrast(1.08) brightness(1.04);
+  z-index: 5;
+}

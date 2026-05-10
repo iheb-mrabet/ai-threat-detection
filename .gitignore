@@ -18,3 +18,24 @@ frontend/node_modules/
 
 node_modules/
 frontend/node_modules/
+
+# Local env/secrets
+.env
+
+# Local backups
+*.bak
+*.bak_*
+*.backup
+
+# Runtime logs
+*.log
+data/*.log
+dev-log/*.log
+
+# Local backups
+*.bak
+*.bak_*
+*.backup
+
+# Local env/secrets
+.env

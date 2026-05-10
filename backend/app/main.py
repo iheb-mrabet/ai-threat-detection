@@ -26,6 +26,9 @@ from backend.app.pipeline.queue import raw_queue
 from backend.app.pipeline.engine import start_pipeline
 from backend.app.alerts import ACTIVE_WEBSOCKETS, broadcast_alert
 from backend.app.redis_client import redis_publisher
+from backend.app.qr_auth import router as qr_auth_router
+from backend.app.qr_ws import router as qr_ws_router
+from backend.app.webauthn_auth import router as webauthn_router
 
 from backend.app.db.database import get_db, Base, engine
 from backend.app.db.repository import (
@@ -52,6 +55,10 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+app.include_router(qr_auth_router)
+app.include_router(qr_ws_router)
+app.include_router(webauthn_router)
 
 app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 
@@ -451,3 +458,21 @@ def get_security_metrics():
             "ready": True,
             "metrics": json.load(f)
         }
+
+
+
+
+@app.get("/metrics")
+def prometheus_metrics():
+    """
+    Stable Prometheus-compatible metrics endpoint.
+    Kept simple to avoid scrape crashes.
+    """
+    from fastapi.responses import PlainTextResponse
+
+    content = """# HELP ai_threat_up AI Threat Detection backend status
+# TYPE ai_threat_up gauge
+ai_threat_up 1
+"""
+
+    return PlainTextResponse(content, media_type="text/plain")
